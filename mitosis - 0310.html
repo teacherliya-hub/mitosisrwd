@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>細胞分裂模擬器 (iOS 優化版)</title>
+    <style>
+        :root {
+            --main-bg: #f0f2f5;      
+            --canvas-bg: #ffffff;    
+            --text-main: #1e293b;    
+            
+            --membrane-fill: #e2e8f0;   
+            --membrane-stroke: #334155; 
+            
+            --btn-color: #10b981;
+            --btn-hover: #059669;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--main-bg);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            min-height: 100vh;
+        }
+
+        header {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            letter-spacing: 1px;
+            color: var(--text-main);
+        }
+
+        @media (min-width: 600px) {
+            h1 { font-size: 28px; }
+        }
+
+        #canvas-container {
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 4/3; 
+            background-color: var(--canvas-bg); 
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); 
+            overflow: hidden;
+            position: relative;
+            border: 1px solid #e5e7eb;
+            /* 解決行動裝置點擊延遲 */
+            touch-action: manipulation;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #instruction-box {
+            width: 100%;
+            max-width: 800px;
+            background-color: #bbf7d0; 
+            color: #14532d;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            text-align: center;
+            box-sizing: border-box;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s;
+        }
+
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            background-color: var(--btn-color);
+            color: white;
+            font-weight: bold;
+            transition: background-color 0.2s, transform 0.1s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            flex: 1 1 auto;
+            min-width: 100px;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: var(--btn-hover);
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background-color: #cbd5e1;
+            color: #64748b;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* 優化 iOS 渲染的關鍵 CSS */
+        .blob {
+            fill: var(--membrane-fill);
+            transition: all 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform, filter;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+
+        #nucleus {
+            transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+            fill: rgba(56, 189, 248, 0.1);
+            stroke: #0ea5e9;
+            stroke-width: 3px;
+            transform-origin: 400px 300px; 
+            will-change: transform, opacity;
+        }
+
+        .chromosome {
+            transition: transform 1.8s ease-in-out;
+            will-change: transform;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+
+        .sister-left, .sister-right {
+            transition: transform 1.8s ease-in-out, opacity 0.5s ease-in-out;
+            transform-origin: 0 0; 
+            will-change: transform, opacity;
+        }
+
+        .gene-text {
+            text-anchor: middle;
+            dominant-baseline: middle;
+            font-weight: 900;
+            font-size: 18px;
+            fill: #111;
+            stroke: var(--canvas-bg); 
+            stroke-width: 3px;
+            paint-order: stroke;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🔬 細胞分裂模擬器 (iOS 優化版)</h1>
+    </header>
+
+    <div id="canvas-container">
+        <svg viewBox="0 0 800 600">
+            <defs>
+                <!-- 調整濾鏡範圍以涵蓋 iOS 下的模糊邊界 -->
+                <filter id="goo" x="-40%" y="-40%" width="180%" height="180%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
+                    <feColorMatrix in="blur" mode="matrix" values="
+                        1 0 0 0 0  
+                        0 1 0 0 0  
+                        0 0 1 0 0  
+                        0 0 0 20 -9" result="goo" />
+                    <feMorphology in="goo" operator="dilate" radius="4" result="thick_goo" />
+                    <feGaussianBlur in="thick_goo" stdDeviation="1" result="smoothed_thick" />
+                    <feFlood flood-color="#334155" result="stroke_color" />
+                    <feComposite in="stroke_color" in2="smoothed_thick" operator="in" result="stroke" />
+                    <feComposite in="goo" in2="stroke" operator="over" />
+                </filter>
+
+                <g id="chromatid-long">
+                    <rect x="-12" y="-80" width="24" height="75" rx="12" fill="currentColor" />
+                    <rect x="-12" y="5" width="24" height="75" rx="12" fill="currentColor" />
+                    <rect x="-12" y="-53" width="24" height="18" fill="rgba(255, 255, 255, 0.4)" />
+                    <circle cx="0" cy="0" r="7" fill="#fff" stroke="#999" stroke-width="1" />
+                </g>
+
+                <g id="chromatid-short">
+                    <rect x="-10" y="-45" width="20" height="40" rx="10" fill="currentColor" />
+                    <rect x="-10" y="5" width="20" height="40" rx="10" fill="currentColor" />
+                    <rect x="-10" y="16" width="20" height="14" fill="rgba(255, 255, 255, 0.4)" />
+                    <circle cx="0" cy="0" r="6" fill="#fff" stroke="#999" stroke-width="1" />
+                </g>
+            </defs>
+
+            <g filter="url(#goo)">
+                <circle id="blob1" class="blob" />
+                <circle id="blob2" class="blob" />
+                <circle id="blob3" class="blob" />
+                <circle id="blob4" class="blob" />
+            </g>
+            
+            <circle id="nucleus" cx="400" cy="300" r="220" />
+
+            <g id="chromosome-A" class="chromosome">
+                <g class="sister-left"><use href="#chromatid-long" style="color: #164e9e;" /><text x="0" y="-43" class="gene-text">A</text></g>
+                <g class="sister-right"><use href="#chromatid-long" style="color: #164e9e;" /><text x="0" y="-43" class="gene-text">A</text></g>
+            </g>
+
+            <g id="chromosome-a" class="chromosome">
+                <g class="sister-left"><use href="#chromatid-long" style="color: #9e1616;" /><text x="0" y="-43" class="gene-text">a</text></g>
+                <g class="sister-right"><use href="#chromatid-long" style="color: #9e1616;" /><text x="0" y="-43" class="gene-text">a</text></g>
+            </g>
+
+            <g id="chromosome-B" class="chromosome">
+                <g class="sister-left"><use href="#chromatid-short" style="color: #3b82f6;" /><text x="0" y="24" class="gene-text">B</text></g>
+                <g class="sister-right"><use href="#chromatid-short" style="color: #3b82f6;" /><text x="0" y="24" class="gene-text">B</text></g>
+            </g>
+
+            <g id="chromosome-b" class="chromosome">
+                <g class="sister-left"><use href="#chromatid-short" style="color: #ef4444;" /><text x="0" y="24" class="gene-text">b</text></g>
+                <g class="sister-right"><use href="#chromatid-short" style="color: #ef4444;" /><text x="0" y="24" class="gene-text">b</text></g>
+            </g>
+        </svg>
+    </div>
+
+    <div id="instruction-box">載入中...</div>
+
+    <div id="controls">
+        <button id="btn-prev">上一步</button>
+        <button id="btn-next">下一步</button>
+        <button id="btn-reset">重新開始</button>
+    </div>
+
+    <script>
+        let currentState = 0;
+
+        const stateData = [
+            {   // State 0
+                infoText: "State 0: 準備期 (4條單體染色體, 基因型 AaBb)",
+                chrA: { x: 335, y: 245, rot: -25, spread: 0, splitDist: 0 },
+                chra: { x: 460, y: 240, rot: 35,  spread: 0, splitDist: 0 },
+                chrB: { x: 350, y: 380, rot: -50, spread: 0, splitDist: 0 },
+                chrb: { x: 480, y: 360, rot: 15,  spread: 0, splitDist: 0 },
+                blobs: [
+                    { cx: 400, cy: 300, r: 260 }, { cx: 400, cy: 300, r: 260 },
+                    { cx: 400, cy: 300, r: 260 }, { cx: 400, cy: 300, r: 260 }
+                ]
+            },
+            {   // State 1
+                infoText: "State 1: 染色體複製 (DNA 數量加倍，形成 X 型)",
+                chrA: { x: 335, y: 245, rot: -25, spread: 15, splitDist: 0 },
+                chra: { x: 460, y: 240, rot: 35,  spread: 15, splitDist: 0 },
+                chrB: { x: 350, y: 380, rot: -50, spread: 15, splitDist: 0 },
+                chrb: { x: 480, y: 360, rot: 15,  spread: 15, splitDist: 0 },
+                blobs: [
+                    { cx: 400, cy: 300, r: 260 }, { cx: 400, cy: 300, r: 260 },
+                    { cx: 400, cy: 300, r: 260 }, { cx: 400, cy: 300, r: 260 }
+                ]
+            },
+            {   // State 2
+                infoText: "State 2: 分裂中期 - 所有染色體單獨排列於細胞中央 (無同源配對)",
+                chrA: { x: 400, y: 150, rot: 0, spread: 15, splitDist: 0 },
+                chrb: { x: 400, y: 250, rot: 0, spread: 15, splitDist: 0 },
+                chra: { x: 400, y: 350, rot: 0, spread: 15, splitDist: 0 },
+                chrB: { x: 400, y: 450, rot: 0, spread: 15, splitDist: 0 },
+                blobs: [
+                    { cx: 380, cy: 300, r: 250 }, { cx: 380, cy: 300, r: 250 },
+                    { cx: 420, cy: 300, r: 250 }, { cx: 420, cy: 300, r: 250 }
+                ]
+            },
+            {   // State 3
+                infoText: "State 3: 分裂後期 - 著絲點斷裂，姊妹染色分體分離並移向兩極",
+                chrA: { x: 400, y: 150, rot: 0, spread: 0, splitDist: 140 },
+                chrb: { x: 400, y: 250, rot: 0, spread: 0, splitDist: 140 },
+                chra: { x: 400, y: 350, rot: 0, spread: 0, splitDist: 140 },
+                chrB: { x: 400, y: 450, rot: 0, spread: 0, splitDist: 140 },
+                blobs: [
+                    { cx: 250, cy: 220, r: 200 }, { cx: 250, cy: 380, r: 200 },
+                    { cx: 550, cy: 220, r: 200 }, { cx: 550, cy: 380, r: 200 }
+                ]
+            },
+            {   // State 4
+                infoText: "State 4: 分裂完成！產生 2 個雙套 (2n) 子細胞，大小恢復圓形，染色體重組為雙排",
+                chrA: { x: 360, y: 220, rot: 0, spread: 0, splitDist: 200 }, 
+                chra: { x: 440, y: 220, rot: 0, spread: 0, splitDist: 200 },
+                chrB: { x: 360, y: 380, rot: 0, spread: 0, splitDist: 200 },
+                chrb: { x: 440, y: 380, rot: 0, spread: 0, splitDist: 200 },
+                blobs: [
+                    { cx: 200, cy: 300, r: 180 }, { cx: 200, cy: 300, r: 180 },
+                    { cx: 600, cy: 300, r: 180 }, { cx: 600, cy: 300, r: 180 }
+                ]
+            }
+        ];
+
+        function renderState(stateIndex) {
+            const data = stateData[stateIndex];
+            document.getElementById('instruction-box').innerText = data.infoText;
+            
+            const nucleus = document.getElementById('nucleus');
+            if (stateIndex === 0) {
+                nucleus.style.opacity = "1";
+                nucleus.style.transform = "scale(0.85)";
+                nucleus.style.strokeDasharray = "none";
+            } else if (stateIndex === 1) {
+                nucleus.style.opacity = "1";
+                nucleus.style.transform = "scale(1)";
+                nucleus.style.strokeDasharray = "10 10";
+            } else {
+                nucleus.style.opacity = "0";
+                nucleus.style.transform = "scale(1.1)";
+            }
+
+            for (let i = 0; i < 4; i++) {
+                const blob = document.getElementById(`blob${i + 1}`);
+                const conf = data.blobs[i];
+                // 座標取整數
+                blob.setAttribute('cx', Math.round(conf.cx));
+                blob.setAttribute('cy', Math.round(conf.cy));
+                blob.setAttribute('r', Math.round(conf.r));
+            }
+
+            ['A', 'a', 'B', 'b'].forEach(id => {
+                const chrConf = data['chr' + id];
+                const group = document.getElementById('chromosome-' + id);
+                
+                // 座標取整數，確保渲染對齊像素
+                const rx = Math.round(chrConf.x);
+                const ry = Math.round(chrConf.y);
+                group.style.transform = `translate(${rx}px, ${ry}px) rotate(${chrConf.rot}deg)`;
+
+                const sisLeft = group.querySelector('.sister-left');
+                const sisRight = group.querySelector('.sister-right');
+
+                if (stateIndex === 0) {
+                    sisRight.style.opacity = "0";
+                } else {
+                    sisRight.style.opacity = "1";
+                }
+
+                if (chrConf.splitDist > 0) {
+                    const rd = Math.round(chrConf.splitDist);
+                    sisLeft.style.transform = `translate(-${rd}px, 0px) rotate(0deg)`;
+                    sisRight.style.transform = `translate(${rd}px, 0px) rotate(0deg)`;
+                } else {
+                    sisLeft.style.transform = `rotate(-${chrConf.spread}deg)`;
+                    sisRight.style.transform = `rotate(${chrConf.spread}deg)`;
+                }
+            });
+
+            document.getElementById('btn-prev').disabled = (stateIndex === 0);
+            document.getElementById('btn-next').disabled = (stateIndex === 4);
+        }
+
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            if (currentState > 0) {
+                currentState--;
+                renderState(currentState);
+            }
+        });
+
+        document.getElementById('btn-next').addEventListener('click', () => {
+            if (currentState < 4) {
+                currentState++;
+                renderState(currentState);
+            }
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            currentState = 0;
+            renderState(currentState);
+        });
+
+        renderState(currentState);
+    </script>
+</body>
+</html>
