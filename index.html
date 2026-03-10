@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>細胞分裂模擬器 (iOS 優化版)</title>
+    <title>細胞分裂模擬器 (RWD 優化版)</title>
     <style>
         :root {
             --main-bg: #f0f2f5;      
@@ -31,19 +31,22 @@
         }
 
         header {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             text-align: center;
+            width: 100%;
         }
 
         h1 {
             margin: 0;
-            font-size: 24px;
+            font-size: 20px; /* 行動端預設較小 */
             letter-spacing: 1px;
             color: var(--text-main);
+            word-break: keep-all;
         }
 
         @media (min-width: 600px) {
-            h1 { font-size: 28px; }
+            h1 { font-size: 26px; }
+            header { margin-bottom: 20px; }
         }
 
         #canvas-container {
@@ -56,8 +59,17 @@
             overflow: hidden;
             position: relative;
             border: 1px solid #e5e7eb;
-            /* 解決行動裝置點擊延遲 */
             touch-action: manipulation;
+        }
+
+        /* RWD: 在手機上限制畫布高度，確保按鈕不被擠出螢幕 */
+        @media (max-width: 768px) {
+            #canvas-container {
+                max-height: 60vh;
+                /* 若高度觸發限制，寬度會自動縮小以維持比例 (如果瀏覽器支援) */
+                width: auto; 
+                margin: 0 auto;
+            }
         }
 
         svg {
@@ -71,45 +83,71 @@
             max-width: 800px;
             background-color: #bbf7d0; 
             color: #14532d;
-            padding: 16px;
+            padding: 12px; /* 縮小內距 */
             border-radius: 8px;
-            margin-top: 15px;
+            margin-top: 12px;
             font-weight: 800;
-            font-size: 1.1rem;
+            font-size: 1rem;
             text-align: center;
             box-sizing: border-box;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
             transition: all 0.3s;
+            min-height: 3em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (min-width: 600px) {
+            #instruction-box {
+                padding: 16px;
+                margin-top: 20px;
+                font-size: 1.1rem;
+            }
         }
 
         #controls {
-            margin-top: 20px;
+            margin-top: 15px;
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: wrap; /* 自動換行 */
             justify-content: center;
-            gap: 10px;
+            gap: 8px;
             width: 100%;
             max-width: 800px;
+            padding-bottom: 20px; /* 底部緩衝 */
         }
 
         button {
-            padding: 12px 24px;
-            font-size: 1rem;
+            padding: 12px 16px;
+            font-size: 0.95rem;
             cursor: pointer;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             background-color: var(--btn-color);
             color: white;
             font-weight: bold;
             transition: background-color 0.2s, transform 0.1s;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            flex: 1 1 auto;
-            min-width: 100px;
+            flex: 1 1 120px; /* 設定最小寬度為 120px 以利點擊 */
+            max-width: 250px;
+        }
+
+        @media (min-width: 600px) {
+            button {
+                padding: 12px 24px;
+                font-size: 1rem;
+                gap: 12px;
+            }
+            #controls { gap: 12px; }
         }
 
         button:hover:not(:disabled) {
             background-color: var(--btn-hover);
             transform: translateY(-2px);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
         }
 
         button:disabled {
@@ -120,7 +158,7 @@
             transform: none;
         }
 
-        /* 優化 iOS 渲染的關鍵 CSS */
+        /* 渲染優化樣式 */
         .blob {
             fill: var(--membrane-fill);
             transition: all 1.8s cubic-bezier(0.4, 0, 0.2, 1);
@@ -167,13 +205,12 @@
 <body>
 
     <header>
-        <h1>🔬 細胞分裂模擬器 (iOS 優化版)</h1>
+        <h1>🔬 細胞分裂模擬器 (RWD 優化版)</h1>
     </header>
 
     <div id="canvas-container">
         <svg viewBox="0 0 800 600">
             <defs>
-                <!-- 調整濾鏡範圍以涵蓋 iOS 下的模糊邊界 -->
                 <filter id="goo" x="-40%" y="-40%" width="180%" height="180%">
                     <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
                     <feColorMatrix in="blur" mode="matrix" values="
@@ -247,7 +284,7 @@
 
         const stateData = [
             {   // State 0
-                infoText: "State 0: 準備期 (4條單體染色體, 基因型 AaBb)",
+                infoText: "State 0: 準備期 (基因型 AaBb)",
                 chrA: { x: 335, y: 245, rot: -25, spread: 0, splitDist: 0 },
                 chra: { x: 460, y: 240, rot: 35,  spread: 0, splitDist: 0 },
                 chrB: { x: 350, y: 380, rot: -50, spread: 0, splitDist: 0 },
@@ -258,7 +295,7 @@
                 ]
             },
             {   // State 1
-                infoText: "State 1: 染色體複製 (DNA 數量加倍，形成 X 型)",
+                infoText: "State 1: 染色體複製 (形成 X 型)",
                 chrA: { x: 335, y: 245, rot: -25, spread: 15, splitDist: 0 },
                 chra: { x: 460, y: 240, rot: 35,  spread: 15, splitDist: 0 },
                 chrB: { x: 350, y: 380, rot: -50, spread: 15, splitDist: 0 },
@@ -269,7 +306,7 @@
                 ]
             },
             {   // State 2
-                infoText: "State 2: 分裂中期 - 所有染色體單獨排列於細胞中央 (無同源配對)",
+                infoText: "State 2: 中期 - 染色體單獨排列於中央",
                 chrA: { x: 400, y: 150, rot: 0, spread: 15, splitDist: 0 },
                 chrb: { x: 400, y: 250, rot: 0, spread: 15, splitDist: 0 },
                 chra: { x: 400, y: 350, rot: 0, spread: 15, splitDist: 0 },
@@ -280,7 +317,7 @@
                 ]
             },
             {   // State 3
-                infoText: "State 3: 分裂後期 - 著絲點斷裂，姊妹染色分體分離並移向兩極",
+                infoText: "State 3: 後期 - 姊妹染色分體分離",
                 chrA: { x: 400, y: 150, rot: 0, spread: 0, splitDist: 140 },
                 chrb: { x: 400, y: 250, rot: 0, spread: 0, splitDist: 140 },
                 chra: { x: 400, y: 350, rot: 0, spread: 0, splitDist: 140 },
@@ -291,7 +328,7 @@
                 ]
             },
             {   // State 4
-                infoText: "State 4: 分裂完成！產生 2 個雙套 (2n) 子細胞，大小恢復圓形，染色體重組為雙排",
+                infoText: "State 4: 分裂完成！產生 2 個子細胞",
                 chrA: { x: 360, y: 220, rot: 0, spread: 0, splitDist: 200 }, 
                 chra: { x: 440, y: 220, rot: 0, spread: 0, splitDist: 200 },
                 chrB: { x: 360, y: 380, rot: 0, spread: 0, splitDist: 200 },
@@ -324,7 +361,6 @@
             for (let i = 0; i < 4; i++) {
                 const blob = document.getElementById(`blob${i + 1}`);
                 const conf = data.blobs[i];
-                // 座標取整數
                 blob.setAttribute('cx', Math.round(conf.cx));
                 blob.setAttribute('cy', Math.round(conf.cy));
                 blob.setAttribute('r', Math.round(conf.r));
@@ -334,7 +370,6 @@
                 const chrConf = data['chr' + id];
                 const group = document.getElementById('chromosome-' + id);
                 
-                // 座標取整數，確保渲染對齊像素
                 const rx = Math.round(chrConf.x);
                 const ry = Math.round(chrConf.y);
                 group.style.transform = `translate(${rx}px, ${ry}px) rotate(${chrConf.rot}deg)`;
