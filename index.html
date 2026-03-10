@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>細胞分裂模擬器 (RWD 優化版)</title>
+    <title>細胞分裂模擬器 (RWD 尺寸優化版)</title>
     <style>
         :root {
             --main-bg: #f0f2f5;      
@@ -25,51 +25,44 @@
             flex-direction: column;
             align-items: center;
             margin: 0;
-            padding: 20px;
+            padding: 10px; /* 縮小邊距 */
             box-sizing: border-box;
             min-height: 100vh;
         }
 
         header {
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             text-align: center;
             width: 100%;
         }
 
         h1 {
             margin: 0;
-            font-size: 20px; /* 行動端預設較小 */
+            font-size: 1.25rem; /* 更精簡的標題 */
             letter-spacing: 1px;
             color: var(--text-main);
             word-break: keep-all;
         }
 
         @media (min-width: 600px) {
-            h1 { font-size: 26px; }
-            header { margin-bottom: 20px; }
+            h1 { font-size: 1.6rem; }
+            header { margin-bottom: 12px; }
+            body { padding: 15px; }
         }
 
         #canvas-container {
             width: 100%;
-            max-width: 800px;
+            max-width: 720px; /* 從 800px 縮小，讓電腦版更精緻 */
+            max-height: 60vh; /* 嚴格限制高度佔比，確保按鈕可見 */
             aspect-ratio: 4/3; 
             background-color: var(--canvas-bg); 
             border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); 
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08); 
             overflow: hidden;
             position: relative;
             border: 1px solid #e5e7eb;
             touch-action: manipulation;
-        }
-
-        /* RWD: 在手機上限制畫布高度，確保按鈕不被擠出螢幕 */
-        @media (max-width: 768px) {
-            #canvas-container {
-                max-height: 60vh;
-                /* 若高度觸發限制，寬度會自動縮小以維持比例 (如果瀏覽器支援) */
-                width: auto; 
-                margin: 0 auto;
-            }
+            margin: 0 auto;
         }
 
         svg {
@@ -80,19 +73,19 @@
 
         #instruction-box {
             width: 100%;
-            max-width: 800px;
+            max-width: 720px;
             background-color: #bbf7d0; 
             color: #14532d;
-            padding: 12px; /* 縮小內距 */
+            padding: 10px; 
             border-radius: 8px;
-            margin-top: 12px;
+            margin-top: 10px;
             font-weight: 800;
-            font-size: 1rem;
+            font-size: 0.95rem;
             text-align: center;
             box-sizing: border-box;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
             transition: all 0.3s;
-            min-height: 3em;
+            min-height: 2.5em;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -100,26 +93,26 @@
 
         @media (min-width: 600px) {
             #instruction-box {
-                padding: 16px;
-                margin-top: 20px;
-                font-size: 1.1rem;
+                padding: 14px;
+                margin-top: 15px;
+                font-size: 1.05rem;
             }
         }
 
         #controls {
-            margin-top: 15px;
+            margin-top: 12px;
             display: flex;
-            flex-wrap: wrap; /* 自動換行 */
+            flex-wrap: wrap; 
             justify-content: center;
             gap: 8px;
             width: 100%;
-            max-width: 800px;
-            padding-bottom: 20px; /* 底部緩衝 */
+            max-width: 720px;
+            padding-bottom: 15px;
         }
 
         button {
-            padding: 12px 16px;
-            font-size: 0.95rem;
+            padding: 10px 14px;
+            font-size: 0.9rem;
             cursor: pointer;
             border: none;
             border-radius: 8px;
@@ -127,18 +120,17 @@
             color: white;
             font-weight: bold;
             transition: background-color 0.2s, transform 0.1s;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            flex: 1 1 120px; /* 設定最小寬度為 120px 以利點擊 */
-            max-width: 250px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            flex: 1 1 100px;
+            max-width: 200px;
         }
 
         @media (min-width: 600px) {
             button {
-                padding: 12px 24px;
-                font-size: 1rem;
-                gap: 12px;
+                padding: 12px 20px;
+                font-size: 0.95rem;
             }
-            #controls { gap: 12px; }
+            #controls { gap: 10px; }
         }
 
         button:hover:not(:disabled) {
@@ -158,7 +150,7 @@
             transform: none;
         }
 
-        /* 渲染優化樣式 */
+        /* iOS 渲染優化 */
         .blob {
             fill: var(--membrane-fill);
             transition: all 1.8s cubic-bezier(0.4, 0, 0.2, 1);
@@ -205,12 +197,13 @@
 <body>
 
     <header>
-        <h1>🔬 細胞分裂模擬器 (RWD 優化版)</h1>
+        <h1>🔬 細胞分裂模擬器 (精簡 RWD 版)</h1>
     </header>
 
     <div id="canvas-container">
         <svg viewBox="0 0 800 600">
             <defs>
+                <!-- iOS 濾鏡修正 -->
                 <filter id="goo" x="-40%" y="-40%" width="180%" height="180%">
                     <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
                     <feColorMatrix in="blur" mode="matrix" values="
@@ -247,7 +240,7 @@
                 <circle id="blob4" class="blob" />
             </g>
             
-            <circle id="nucleus" cx="400" cy="300" r="220" />
+            <circle id="nucleus" cx="400" cy="300" r="210" /> <!-- 稍微縮小核半徑，視覺更舒適 -->
 
             <g id="chromosome-A" class="chromosome">
                 <g class="sister-left"><use href="#chromatid-long" style="color: #164e9e;" /><text x="0" y="-43" class="gene-text">A</text></g>
@@ -290,8 +283,8 @@
                 chrB: { x: 350, y: 380, rot: -50, spread: 0, splitDist: 0 },
                 chrb: { x: 480, y: 360, rot: 15,  spread: 0, splitDist: 0 },
                 blobs: [
-                    { cx: 400, cy: 300, r: 260 }, { cx: 400, cy: 300, r: 260 },
-                    { cx: 400, cy: 300, r: 260 }, { cx: 400, cy: 300, r: 260 }
+                    { cx: 400, cy: 300, r: 250 }, { cx: 400, cy: 300, r: 250 },
+                    { cx: 400, cy: 300, r: 250 }, { cx: 400, cy: 300, r: 250 }
                 ]
             },
             {   // State 1
@@ -301,8 +294,8 @@
                 chrB: { x: 350, y: 380, rot: -50, spread: 15, splitDist: 0 },
                 chrb: { x: 480, y: 360, rot: 15,  spread: 15, splitDist: 0 },
                 blobs: [
-                    { cx: 400, cy: 300, r: 260 }, { cx: 400, cy: 300, r: 260 },
-                    { cx: 400, cy: 300, r: 260 }, { cx: 400, cy: 300, r: 260 }
+                    { cx: 400, cy: 300, r: 250 }, { cx: 400, cy: 300, r: 250 },
+                    { cx: 400, cy: 300, r: 250 }, { cx: 400, cy: 300, r: 250 }
                 ]
             },
             {   // State 2
@@ -312,8 +305,8 @@
                 chra: { x: 400, y: 350, rot: 0, spread: 15, splitDist: 0 },
                 chrB: { x: 400, y: 450, rot: 0, spread: 15, splitDist: 0 },
                 blobs: [
-                    { cx: 380, cy: 300, r: 250 }, { cx: 380, cy: 300, r: 250 },
-                    { cx: 420, cy: 300, r: 250 }, { cx: 420, cy: 300, r: 250 }
+                    { cx: 380, cy: 300, r: 240 }, { cx: 380, cy: 300, r: 240 },
+                    { cx: 420, cy: 300, r: 240 }, { cx: 420, cy: 300, r: 240 }
                 ]
             },
             {   // State 3
@@ -323,8 +316,8 @@
                 chra: { x: 400, y: 350, rot: 0, spread: 0, splitDist: 140 },
                 chrB: { x: 400, y: 450, rot: 0, spread: 0, splitDist: 140 },
                 blobs: [
-                    { cx: 250, cy: 220, r: 200 }, { cx: 250, cy: 380, r: 200 },
-                    { cx: 550, cy: 220, r: 200 }, { cx: 550, cy: 380, r: 200 }
+                    { cx: 250, cy: 220, r: 190 }, { cx: 250, cy: 380, r: 190 },
+                    { cx: 550, cy: 220, r: 190 }, { cx: 550, cy: 380, r: 190 }
                 ]
             },
             {   // State 4
@@ -334,8 +327,8 @@
                 chrB: { x: 360, y: 380, rot: 0, spread: 0, splitDist: 200 },
                 chrb: { x: 440, y: 380, rot: 0, spread: 0, splitDist: 200 },
                 blobs: [
-                    { cx: 200, cy: 300, r: 180 }, { cx: 200, cy: 300, r: 180 },
-                    { cx: 600, cy: 300, r: 180 }, { cx: 600, cy: 300, r: 180 }
+                    { cx: 200, cy: 300, r: 170 }, { cx: 200, cy: 300, r: 170 },
+                    { cx: 600, cy: 300, r: 170 }, { cx: 600, cy: 300, r: 170 }
                 ]
             }
         ];
